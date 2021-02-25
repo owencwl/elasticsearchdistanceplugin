@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -98,9 +99,11 @@ public class UmxDistanceAggregator extends MetricsAggregator {
         return new LeafBucketCollectorBase(sub, null) {
             final String[] fieldNames = valuesSources.fieldNames();
 
-            final double[] field1Vals = new double[values1.docValueCount()];
-            final GeoPoint[] field2Vals = new GeoPoint[values2.docValueCount()];
+//            final double[] field1Vals = new double[values1.docValueCount()];
+//            final GeoPoint[] field2Vals = new GeoPoint[values2.docValueCount()];
 
+            //map<timestamp,geopoint>
+            final Map<Double,GeoPoint> map =new HashMap<>();
             @Override
             public void collect(int doc, long bucket) throws IOException {
                 logger.info("doc:{},bucket:{}", doc, bucket);
@@ -136,7 +139,14 @@ public class UmxDistanceAggregator extends MetricsAggregator {
                        GeoPoint location= values2.nextValue();
                        logger.info("timeStamp:{},location:{}",timeStamp,location.toString());
 
+                        if (timeStamp == Double.NEGATIVE_INFINITY) {
+                            // TODO: Fix matrix stats to treat neg inf as any other value
+                            return false;
+                        }
+                        map.put(timeStamp,location);
                     }
+                }else {
+                    return false;
                 }
 
 
