@@ -6,8 +6,11 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -18,8 +21,9 @@ import java.util.Map;
  * @Date 2021/2/23
  */
 public class InternalUmxDistance extends InternalNumericMetricsAggregation.SingleValue implements UmxDistance{
+    private final static Logger logger = LoggerFactory.getLogger(InternalUmxDistance.class);
 
-    private double speed;
+    private  int speedFlag=0;
 
 
     public InternalUmxDistance(StreamInput in) throws IOException {
@@ -29,25 +33,44 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     public InternalUmxDistance(String name,long count, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
         super(name,metadata);
-
     }
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
         out.writeNamedWriteable(format);
-        out.writeDouble(speed);
+        out.writeInt(speedFlag);
     }
 
     /**
-     * reduce计算逻辑，主要实现聚合的业务逻辑
+     * reduce计算逻辑，或运算
      * @param aggregations
      * @param reduceContext
      * @return
      */
     @Override
     public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+       logger.info("InternalUmxDistance_reduce");
+       return null;
 
-        return null;
+//        // merge stats across all shards
+//        List<InternalAggregation> aggs = new ArrayList<>(aggregations);
+//        aggs.removeIf(p -> ((InternalUmxDistance)p).speedFlag == null);
+//
+//        // return empty result iff all stats are null
+//        if (aggs.isEmpty()) {
+//            return new InternalMatrixStats(name, 0, null, new MatrixStatsResults(), getMetadata());
+//        }
+//
+//        RunningStats runningStats = new RunningStats();
+//        for (InternalAggregation agg : aggs) {
+//            runningStats.merge(((InternalMatrixStats) agg).stats);
+//        }
+//
+//        if (reduceContext.isFinalReduce()) {
+//            MatrixStatsResults results = new MatrixStatsResults(runningStats);
+//            return new InternalMatrixStats(name, results.getDocCount(), runningStats, results, getMetadata());
+//        }
+//        return new InternalMatrixStats(name, runningStats.docCount, runningStats, null, getMetadata());
     }
 
     /**
@@ -59,7 +82,7 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
      */
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-        boolean hasValue = !Double.isInfinite(speed);
+        boolean hasValue = !Double.isInfinite(speedFlag);
         /**
          * eg:
          *   "aggregations" : {
@@ -68,10 +91,10 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
          *     }
          *   }
          */
-        builder.field(CommonFields.VALUE.getPreferredName(), hasValue ? speed : null);
+        builder.field(CommonFields.VALUE.getPreferredName(), hasValue ? speedFlag : null);
         //转换字符串格式
         if (hasValue && format != DocValueFormat.RAW) {
-            builder.field(CommonFields.VALUE_AS_STRING.getPreferredName(), format.format(speed).toString());
+            builder.field(CommonFields.VALUE_AS_STRING.getPreferredName(), format.format(speedFlag).toString());
         }
         return builder;
     }
@@ -83,11 +106,11 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     @Override
     public double value() {
-        return speed;
+        return speedFlag;
     }
 
     @Override
     public double getValue() {
-        return speed;
+        return speedFlag;
     }
 }
