@@ -5,6 +5,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * @ClassName UmxDistanceCompute
@@ -14,10 +15,13 @@ import java.io.IOException;
  */
 public class UmxSpeedCompute implements Writeable, Cloneable{
 
+
+
+
     public UmxSpeedCompute() {
     }
 
-    public UmxSpeedCompute(String[] fieldNames, double[] field1Vals, GeoPoint[] field2Vals) {
+    public UmxSpeedCompute(String[] fieldNames, Map<Double,GeoPoint> map) {
     }
 
     private void init(){
@@ -29,7 +33,7 @@ public class UmxSpeedCompute implements Writeable, Cloneable{
 
     }
 
-    public void add(String[] fieldNames, double[] field1Vals, GeoPoint[] field2Vals){
+    public void add(String[] fieldNames,Map<Double,GeoPoint> map){
 
     }
     public void merge(final UmxSpeedCompute other ){

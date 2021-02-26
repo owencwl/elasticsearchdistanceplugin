@@ -1,29 +1,41 @@
 package com.umxwe.elasticsearch.plugin.distance;
 
+import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.PointValues;
+import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.FutureArrays;
 import org.elasticsearch.common.collect.Tuple;
+import org.elasticsearch.common.geo.GeoDistance;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.lease.Releasables;
+import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.Comparators;
+import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.common.util.ObjectArray;
 import org.elasticsearch.index.fielddata.MultiGeoPointValues;
 import org.elasticsearch.index.fielddata.NumericDoubleValues;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
+import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.MultiValueMode;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.LeafBucketCollector;
 import org.elasticsearch.search.aggregations.LeafBucketCollectorBase;
+import org.elasticsearch.search.aggregations.metrics.InternalMax;
 import org.elasticsearch.search.aggregations.metrics.MetricsAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
+import org.elasticsearch.search.sort.SortOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 
 /**
  * @ClassName UmxDistanceAggregator
@@ -37,6 +49,8 @@ public class UmxDistanceAggregator extends MetricsAggregator {
     private final ArrayValuesSource.MultArrayValuesSource valuesSources;
 
     ObjectArray<UmxSpeedCompute> speeds;
+    DoubleArray maxes;
+
 
     public UmxDistanceAggregator(String name, Map<String, ValuesSource> valuesSources, SearchContext searchContext, Aggregator aggregator, MultiValueMode multiValueMode, Map<String, Object> stringObjectMap) throws IOException {
         super(name, searchContext, aggregator, stringObjectMap);
@@ -46,9 +60,14 @@ public class UmxDistanceAggregator extends MetricsAggregator {
             logger.info("UmxDistanceAggregator_values1_size:{},values2_size:{}"
                     , this.valuesSources.values1 != null ? this.valuesSources.values1 : 0
                     , this.valuesSources.values2 != null ? this.valuesSources.values2 : 0);
+
+            maxes = context.bigArrays().newDoubleArray(1, false);
+            maxes.fill(0, maxes.size(), Double.NEGATIVE_INFINITY);
+
         } else {
             this.valuesSources = null;
         }
+
     }
 
 
@@ -61,16 +80,35 @@ public class UmxDistanceAggregator extends MetricsAggregator {
      */
     @Override
     public InternalAggregation buildAggregation(long bucket) throws IOException {
-        if (valuesSources == null || bucket >= speeds.size()) {
+        if (valuesSources == null || bucket >= maxes.size()) {
             return buildEmptyAggregation();
         }
-        final UmxSpeedCompute speed = speeds.get(bucket);
-        return new InternalUmxDistance(name, speeds.size(), speed, metadata());
+        return new InternalMax(name, maxes.get(bucket), DocValueFormat.RAW, metadata());
+
+//        if (valuesSources == null || bucket >= speeds.size()) {
+//            return buildEmptyAggregation();
+//        }
+//        final UmxSpeedCompute speed = speeds.get(bucket);
+//        return new InternalUmxDistance(name, speeds.size(), speed, metadata());
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalUmxDistance(name, 0, null, metadata());
+        return new InternalMax(name, Double.NEGATIVE_INFINITY, DocValueFormat.RAW, metadata());
+
+//        return new InternalUmxDistance(name, 0, null, metadata());
+    }
+
+    public double metric(long owningBucketOrd) {
+        if (valuesSources == null || owningBucketOrd >= maxes.size()) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return maxes.get(owningBucketOrd);
+    }
+
+    @Override
+    public BucketComparator bucketComparator(String key, SortOrder order) {
+        return (lhs, rhs) -> Comparators.compareDiscardNaN(metric(lhs), metric(rhs), order == SortOrder.ASC);
     }
 
     /**
@@ -86,6 +124,8 @@ public class UmxDistanceAggregator extends MetricsAggregator {
         if (valuesSources == null) {
             return LeafBucketCollector.NO_OP_COLLECTOR;
         }
+
+
         final BigArrays bigArrays = context.bigArrays();
 
         SortedNumericDoubleValues values1 = valuesSources.getValues1().doubleValues(ctx);
@@ -99,28 +139,109 @@ public class UmxDistanceAggregator extends MetricsAggregator {
         return new LeafBucketCollectorBase(sub, null) {
             final String[] fieldNames = valuesSources.fieldNames();
 
-//            final double[] field1Vals = new double[values1.docValueCount()];
-//            final GeoPoint[] field2Vals = new GeoPoint[values2.docValueCount()];
-
             //map<timestamp,geopoint>
-            final Map<Double,GeoPoint> map =new HashMap<>();
+            final Map<Double, GeoPoint> map = new HashMap<>();
+            final List<Tuple<Double, GeoPoint>> list= new ArrayList<>();
+
             @Override
             public void collect(int doc, long bucket) throws IOException {
                 logger.info("doc:{},bucket:{}", doc, bucket);
                 // get fields
                 if (includeDocument(doc)) {
 
+                    /**
+                     * 1、一般情况map size 等于 docValueCount
+                     * 2、特殊情况，map size 小于 docValueCount ，说明时间戳存在重复的情况，说明在相同时间存在不同的坐标，直接判定为套牌车
+                     */
+                    if (map.size() < values1.docValueCount()) {
+                        logger.info("时间戳存在重复的情况，说明在相同时间存在不同的坐标，直接判定为套牌车");
+                        maxes.set(bucket, Double.MAX_VALUE);
+
+                    }
+                    SortedNumericDoubleValues speedValues = computeSpeed(map,list);
+
+                    NumericDoubleValues values = MultiValueMode.MAX.select(speedValues);
+
+                    if (bucket >= maxes.size()) {
+                        long from = maxes.size();
+                        maxes = bigArrays.grow(maxes, bucket + 1);
+                        maxes.fill(from, maxes.size(), Double.NEGATIVE_INFINITY);
+                    }
+                    final double value = values.doubleValue();
+                    double max = maxes.get(bucket);
+                    max = Math.max(max, value);
+                    maxes.set(bucket, max);
+
 
 //                    speeds = bigArrays.grow(speeds, bucket + 1);
 //                    UmxSpeedCompute speed = speeds.get(bucket);
 //                    // add document fields to correlation stats
 //                    if (speed == null) {
-//                        speed = new UmxSpeedCompute(fieldNames, field1Vals,field2Vals);
+//                        speed = new UmxSpeedCompute(fieldNames,map);
 //                        speeds.set(bucket, speed);
 //                    } else {
-//                        speed.add(fieldNames, field1Vals,field2Vals);
+//                        speed.add(fieldNames, map);
 //                    }
                 }
+            }
+
+            /**
+             * 速度计算逻辑
+             * @param mapObject
+             * @param list
+             * @return
+             */
+            private SortedNumericDoubleValues computeSpeed(Map<Double, GeoPoint> mapObject,List<Tuple<Double, GeoPoint>> list) {
+
+                logger.info("map_size:{},list_size:{}",mapObject.size(),list.size());
+
+                /**
+                 * 时间复杂度有点高，有待优化
+                 */
+               long current= System.currentTimeMillis();
+                for (int i = 0; i <list.size() ; i++) {
+                    for (int j = i+1; j <list.size() ; j++) {
+                        double distance=  GeoDistance.ARC.calculate(
+                                list.get(i).v2().lat(),list.get(i).v2().lon()
+                                ,list.get(j).v2().lat(),list.get(j).v2().lon()
+                                , DistanceUnit.KILOMETERS);
+                        double time=Math.abs( list.get(i).v1()- list.get(j).v1())/1000*60*60;
+
+                        double speed=distance/time;
+                        logger.info("distance:{},time:{},speed:{}",distance,time,speed);
+                        if(speed>80){
+                            break;
+                        }
+                    }
+                }
+                logger.info("distance_time:{} ms",System.currentTimeMillis()-current);
+
+                /**
+                 * speed list need transform to SortedNumericDoubleValues
+                 */
+
+                SortedNumericDoubleValues mult = new SortedNumericDoubleValues() {
+
+                    @Override
+                    public boolean advanceExact(int target) throws IOException {
+                        return false;
+                    }
+
+                    @Override
+                    public double nextValue() throws IOException {
+                        double value = new Random().nextDouble();
+                        logger.info("SortedNumericDoubleValues:{}", value);
+                        return value;
+                    }
+
+                    @Override
+                    public int docValueCount() {
+                        return 10;
+                    }
+                };
+
+                return mult;
+
             }
 
             /**
@@ -131,45 +252,25 @@ public class UmxDistanceAggregator extends MetricsAggregator {
                 if (values1.advanceExact(doc) && values2.advanceExact(doc)) {
                     final int valuesCount1 = values1.docValueCount();
                     final int valuesCount2 = values2.docValueCount();
-                    if(valuesCount1!=valuesCount2){
+                    if (valuesCount1 != valuesCount2) {
                         return false;
                     }
                     for (int i = 0; i < valuesCount1; i++) {
-                        double timeStamp= values1.nextValue();
-                       GeoPoint location= values2.nextValue();
-                       logger.info("timeStamp:{},location:{}",timeStamp,location.toString());
+                        double timeStamp = values1.nextValue();
+                        GeoPoint location = values2.nextValue();
+                        logger.info("timeStamp:{},location:{}", timeStamp, location.toString());
 
                         if (timeStamp == Double.NEGATIVE_INFINITY) {
                             // TODO: Fix matrix stats to treat neg inf as any other value
                             return false;
                         }
-                        map.put(timeStamp,location);
+                        map.put(timeStamp, location);
+                        list.add(new Tuple<Double, GeoPoint>(timeStamp,location));
+                        
                     }
-                }else {
+                } else {
                     return false;
                 }
-
-
-                // loop over fields
-//                for (int i = 0; i < field1Vals.length; ++i) {
-//                    final NumericDoubleValues doubleValues = values1[i];
-//                    final int valuesCount = values2[i].docValueCount();
-//
-//                    final MultiGeoPointValues geoPointValues = values2[i];
-//                    if (doubleValues.advanceExact(doc) && geoPointValues.advanceExact(doc)) {
-//                        final double value1 = doubleValues.doubleValue();
-//                        logger.info("value1:{}",value1);
-//                        final GeoPoint value2 = geoPointValues.nextValue();
-//                        if (value1 == Double.NEGATIVE_INFINITY) {
-//                            // TODO: Fix matrix stats to treat neg inf as any other value
-//                            return false;
-//                        }
-//                        field1Vals[i] = value1;
-//                        field2Vals[i] = value2;
-//                    } else {
-//                        return false;
-//                    }
-//                }
                 return true;
             }
         };
