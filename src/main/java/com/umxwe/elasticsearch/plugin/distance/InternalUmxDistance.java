@@ -26,8 +26,8 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     private final UmxSpeedCompute speedCompute;
 
-    private final double result;
-    private final long count;
+    private  double result=0.0;
+    private  long count=0;
 
 
     public InternalUmxDistance(StreamInput in) throws IOException {
@@ -48,7 +48,6 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
-//        out.writeOptionalWriteable(speedCompute);
         out.writeDouble(result);
         out.writeLong(count);
 
@@ -87,17 +86,20 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
      */
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-        builder.field(CommonFields.DOC_COUNT.getPreferredName(),count);
-        builder.field("maxspeed", result);
+
 
         /**
          * eg:
-         *   "aggregations" : {
-         *     "plateNo_count" : {
-         *       "value" : 185722
-         *     }
-         *   }
+         *   "speed" :
+         *   {
+         *        "doc_count" : 1,
+         *        "maxspeed" : 3.0887521601880075E-7
+         *    }
          */
+        builder.field(CommonFields.DOC_COUNT.getPreferredName(),count);
+        builder.field("maxspeed", result);
+
+
         return builder;
     }
 

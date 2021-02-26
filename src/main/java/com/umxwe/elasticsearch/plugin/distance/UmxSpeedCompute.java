@@ -92,10 +92,13 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
                     , DistanceUnit.KILOMETERS);
 
             double time = Math.abs(item.getKey() - timestamp) / 1000 * 60 * 60;
+
             if(time==0.0){
+                //时间差为0，直接返回负无穷大
                 maxSpeed = Math.max(maxSpeed, Double.NEGATIVE_INFINITY);
                 return;
             }else if(time==0.0 && distance > 80){
+                //时间差为0，并且距离大于80km以上，直接返回正无穷大，说明存在套牌车
                 maxSpeed = Math.max(maxSpeed, Double.POSITIVE_INFINITY);
                 return;
             }
