@@ -49,20 +49,17 @@ public class UmxDistanceAggregator extends MetricsAggregator {
     private final ArrayValuesSource.MultArrayValuesSource valuesSources;
 
     ObjectArray<UmxSpeedCompute> speeds;
-    DoubleArray maxes;
 
 
     public UmxDistanceAggregator(String name, Map<String, ValuesSource> valuesSources, SearchContext searchContext, Aggregator aggregator, MultiValueMode multiValueMode, Map<String, Object> stringObjectMap) throws IOException {
         super(name, searchContext, aggregator, stringObjectMap);
         if (valuesSources != null && !valuesSources.isEmpty()) {
             this.valuesSources = new ArrayValuesSource.MultArrayValuesSource(valuesSources, multiValueMode);
-
             logger.info("UmxDistanceAggregator_values1_size:{},values2_size:{}"
                     , this.valuesSources.values1 != null ? this.valuesSources.values1 : 0
                     , this.valuesSources.values2 != null ? this.valuesSources.values2 : 0);
 
-            maxes = context.bigArrays().newDoubleArray(1, false);
-            maxes.fill(0, maxes.size(), Double.NEGATIVE_INFINITY);
+            speeds  = context.bigArrays().newObjectArray(1);
 
         } else {
             this.valuesSources = null;
@@ -80,35 +77,17 @@ public class UmxDistanceAggregator extends MetricsAggregator {
      */
     @Override
     public InternalAggregation buildAggregation(long bucket) throws IOException {
-        if (valuesSources == null || bucket >= maxes.size()) {
+        if (valuesSources == null || bucket >= speeds.size()) {
             return buildEmptyAggregation();
         }
-        return new InternalMax(name, maxes.get(bucket), DocValueFormat.RAW, metadata());
-
-//        if (valuesSources == null || bucket >= speeds.size()) {
-//            return buildEmptyAggregation();
-//        }
-//        final UmxSpeedCompute speed = speeds.get(bucket);
-//        return new InternalUmxDistance(name, speeds.size(), speed, metadata());
+        //每个bucket的计算结果对象
+        final UmxSpeedCompute speed = speeds.get(bucket);
+        return new InternalUmxDistance(name, 0,0, speed, metadata());
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalMax(name, Double.NEGATIVE_INFINITY, DocValueFormat.RAW, metadata());
-
-//        return new InternalUmxDistance(name, 0, null, metadata());
-    }
-
-    public double metric(long owningBucketOrd) {
-        if (valuesSources == null || owningBucketOrd >= maxes.size()) {
-            return Double.NEGATIVE_INFINITY;
-        }
-        return maxes.get(owningBucketOrd);
-    }
-
-    @Override
-    public BucketComparator bucketComparator(String key, SortOrder order) {
-        return (lhs, rhs) -> Comparators.compareDiscardNaN(metric(lhs), metric(rhs), order == SortOrder.ASC);
+        return new InternalUmxDistance(name, 0,0, null, metadata());
     }
 
     /**
@@ -124,7 +103,10 @@ public class UmxDistanceAggregator extends MetricsAggregator {
         if (valuesSources == null) {
             return LeafBucketCollector.NO_OP_COLLECTOR;
         }
-
+        final String[] fieldNames = valuesSources.fieldNames();
+        //map<timestamp,geopoint>
+        final Map<Double, GeoPoint> map = new HashMap<>();
+        final List<Tuple<Double, GeoPoint>> list= new ArrayList<>();
 
         final BigArrays bigArrays = context.bigArrays();
 
@@ -137,51 +119,34 @@ public class UmxDistanceAggregator extends MetricsAggregator {
 //        GeoDistance.ARC.calculate();
         //valuesSources 转为 number and  geopoint类型
         return new LeafBucketCollectorBase(sub, null) {
-            final String[] fieldNames = valuesSources.fieldNames();
-
-            //map<timestamp,geopoint>
-            final Map<Double, GeoPoint> map = new HashMap<>();
-            final List<Tuple<Double, GeoPoint>> list= new ArrayList<>();
-
             @Override
             public void collect(int doc, long bucket) throws IOException {
                 logger.info("doc:{},bucket:{}", doc, bucket);
                 // get fields
-                if (includeDocument(doc)) {
+                if (values1.advanceExact(doc) && values2.advanceExact(doc)) {
 
                     /**
                      * 1、一般情况map size 等于 docValueCount
                      * 2、特殊情况，map size 小于 docValueCount ，说明时间戳存在重复的情况，说明在相同时间存在不同的坐标，直接判定为套牌车
                      */
-                    if (map.size() < values1.docValueCount()) {
-                        logger.info("时间戳存在重复的情况，说明在相同时间存在不同的坐标，直接判定为套牌车");
-                        maxes.set(bucket, Double.MAX_VALUE);
-
-                    }
-                    SortedNumericDoubleValues speedValues = computeSpeed(map,list);
-
-                    NumericDoubleValues values = MultiValueMode.MAX.select(speedValues);
-
-                    if (bucket >= maxes.size()) {
-                        long from = maxes.size();
-                        maxes = bigArrays.grow(maxes, bucket + 1);
-                        maxes.fill(from, maxes.size(), Double.NEGATIVE_INFINITY);
-                    }
-                    final double value = values.doubleValue();
-                    double max = maxes.get(bucket);
-                    max = Math.max(max, value);
-                    maxes.set(bucket, max);
-
-
-//                    speeds = bigArrays.grow(speeds, bucket + 1);
-//                    UmxSpeedCompute speed = speeds.get(bucket);
-//                    // add document fields to correlation stats
-//                    if (speed == null) {
-//                        speed = new UmxSpeedCompute(fieldNames,map);
-//                        speeds.set(bucket, speed);
-//                    } else {
-//                        speed.add(fieldNames, map);
+//                    if (map.size() < values1.docValueCount()) {
+//                        logger.info("时间戳存在重复的情况，说明在相同时间存在不同的坐标，直接判定为套牌车");
 //                    }
+
+//                    SortedNumericDoubleValues speedValues = computeSpeed(map,list);
+                    speeds = bigArrays.grow(speeds, bucket + 1);
+
+                    for (int i = 0; i < values1.docValueCount(); i++) {
+
+                        UmxSpeedCompute speed = speeds.get(bucket);
+                        if (speed == null) {
+                            speed = new UmxSpeedCompute(values1.nextValue(), values2.nextValue());
+                            speeds.set(bucket, speed);
+                        } else {
+                            speed.add(values1.nextValue(), values2.nextValue());
+                        }
+
+                    }
                 }
             }
 
@@ -259,11 +224,6 @@ public class UmxDistanceAggregator extends MetricsAggregator {
                         double timeStamp = values1.nextValue();
                         GeoPoint location = values2.nextValue();
                         logger.info("timeStamp:{},location:{}", timeStamp, location.toString());
-
-                        if (timeStamp == Double.NEGATIVE_INFINITY) {
-                            // TODO: Fix matrix stats to treat neg inf as any other value
-                            return false;
-                        }
                         map.put(timeStamp, location);
                         list.add(new Tuple<Double, GeoPoint>(timeStamp,location));
                         

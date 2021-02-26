@@ -6,6 +6,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
+import org.elasticsearch.search.aggregations.metrics.InternalSum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,61 +21,65 @@ import java.util.Map;
  * @Author owen(umxwe)
  * @Date 2021/2/23
  */
-public class InternalUmxDistance extends InternalNumericMetricsAggregation.SingleValue implements UmxDistance{
+public class InternalUmxDistance extends InternalNumericMetricsAggregation.SingleValue implements UmxDistance {
     private final static Logger logger = LoggerFactory.getLogger(InternalUmxDistance.class);
 
-    private  int speedFlag=0;
+    private final UmxSpeedCompute speedCompute;
+
+    private final double result;
+    private final long count;
 
 
     public InternalUmxDistance(StreamInput in) throws IOException {
         super(in);
-        format = in.readNamedWriteable(DocValueFormat.class);
+        speedCompute = in.readOptionalWriteable(UmxSpeedCompute::new);
+        result = in.readDouble();
+        count = in.readLong();
+
     }
 
-    public InternalUmxDistance(String name,long count, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
-        super(name,metadata);
+    public InternalUmxDistance(String name,long count, double result, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
+        super(name, metadata);
+        this.speedCompute = umxSpeedComputeResults;
+        this.result = result;
+        this.count = count;
     }
+
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
-        out.writeNamedWriteable(format);
-        out.writeInt(speedFlag);
+//        out.writeOptionalWriteable(speedCompute);
+        out.writeDouble(result);
+        out.writeLong(count);
+
     }
 
     /**
      * reduce计算逻辑，或运算
+     *
      * @param aggregations
      * @param reduceContext
      * @return
      */
     @Override
     public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
-       logger.info("InternalUmxDistance_reduce");
-       return null;
+        logger.info("InternalUmxDistance_reduce");
 
-//        // merge stats across all shards
-//        List<InternalAggregation> aggs = new ArrayList<>(aggregations);
-//        aggs.removeIf(p -> ((InternalUmxDistance)p).speedFlag == null);
-//
-//        // return empty result iff all stats are null
-//        if (aggs.isEmpty()) {
-//            return new InternalMatrixStats(name, 0, null, new MatrixStatsResults(), getMetadata());
-//        }
-//
-//        RunningStats runningStats = new RunningStats();
-//        for (InternalAggregation agg : aggs) {
-//            runningStats.merge(((InternalMatrixStats) agg).stats);
-//        }
-//
-//        if (reduceContext.isFinalReduce()) {
-//            MatrixStatsResults results = new MatrixStatsResults(runningStats);
-//            return new InternalMatrixStats(name, results.getDocCount(), runningStats, results, getMetadata());
-//        }
-//        return new InternalMatrixStats(name, runningStats.docCount, runningStats, null, getMetadata());
+        UmxSpeedCompute umxSpeedCompute = new UmxSpeedCompute();
+
+        for (InternalAggregation aggregation : aggregations) {
+            UmxSpeedCompute value = ((InternalUmxDistance) aggregation).speedCompute;
+            umxSpeedCompute.merge(value);
+        }
+        if (reduceContext.isFinalReduce()) {
+            return new InternalUmxDistance(name, umxSpeedCompute.docCount,umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
+        }
+        return new InternalUmxDistance(name,0, 0.0, umxSpeedCompute, getMetadata());
     }
 
     /**
      * 计算结果进行返回
+     *
      * @param builder
      * @param params
      * @return
@@ -82,7 +87,9 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
      */
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-        boolean hasValue = !Double.isInfinite(speedFlag);
+        builder.field(CommonFields.DOC_COUNT.getPreferredName(),count);
+        builder.field("maxspeed", result);
+
         /**
          * eg:
          *   "aggregations" : {
@@ -91,11 +98,6 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
          *     }
          *   }
          */
-        builder.field(CommonFields.VALUE.getPreferredName(), hasValue ? speedFlag : null);
-        //转换字符串格式
-        if (hasValue && format != DocValueFormat.RAW) {
-            builder.field(CommonFields.VALUE_AS_STRING.getPreferredName(), format.format(speedFlag).toString());
-        }
         return builder;
     }
 
@@ -106,11 +108,11 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     @Override
     public double value() {
-        return speedFlag;
+        return result;
     }
 
     @Override
     public double getValue() {
-        return speedFlag;
+        return result;
     }
 }
