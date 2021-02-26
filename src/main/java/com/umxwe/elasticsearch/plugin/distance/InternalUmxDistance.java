@@ -26,15 +26,16 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     private final UmxSpeedCompute speedCompute;
 
-    private  double result=0.0;
-    private  long count=0;
+    private  final double result;
+    private  final long count;
 
 
     public InternalUmxDistance(StreamInput in) throws IOException {
         super(in);
         speedCompute = in.readOptionalWriteable(UmxSpeedCompute::new);
         result = in.readDouble();
-        count = in.readLong();
+        count = in.readVLong();
+
 
     }
 
@@ -49,8 +50,7 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
         out.writeDouble(result);
-        out.writeLong(count);
-
+        out.writeVLong(count);
     }
 
     /**
@@ -62,8 +62,6 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
      */
     @Override
     public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
-        logger.info("InternalUmxDistance_reduce");
-
         UmxSpeedCompute umxSpeedCompute = new UmxSpeedCompute();
 
         for (InternalAggregation aggregation : aggregations) {
@@ -71,6 +69,7 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
             umxSpeedCompute.merge(value);
         }
         if (reduceContext.isFinalReduce()) {
+            logger.info("InternalUmxDistance_isFinalReduce:{}",reduceContext.isFinalReduce());
             return new InternalUmxDistance(name, umxSpeedCompute.docCount,umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
         }
         return new InternalUmxDistance(name,0, 0.0, umxSpeedCompute, getMetadata());

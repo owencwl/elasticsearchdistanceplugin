@@ -28,10 +28,10 @@ public class UmxDistanceParser extends ArrayValuesSourceParser.NumericValuesSour
     @Override
     protected ArrayValuesSourceAggregationBuilder<?> createFactory(String aggregationName, ValuesSourceType valuesSourceType, ValueType targetValueType, Map<ParseField, Object> otherOptions) {
         UmxDistanceAggregationBuilder builder = new UmxDistanceAggregationBuilder(aggregationName);
-        String mode = (String)otherOptions.get(MULTIVALUE_MODE_FIELD);
-        if (mode != null) {
-            builder.multiValueMode(MultiValueMode.fromString(mode));
-        }
+//        String mode = (String)otherOptions.get(MULTIVALUE_MODE_FIELD);
+//        if (mode != null) {
+//            builder.multiValueMode(MultiValueMode.fromString(mode));
+//        }
         return builder;
     }
 

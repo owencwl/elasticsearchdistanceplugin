@@ -23,16 +23,14 @@ import java.util.Map;
  */
 public class ArrayValuesSource<VS extends ValuesSource,VD extends ValuesSource> {
     private final static Logger logger = LoggerFactory.getLogger(ArrayValuesSource.class);
-
-    protected MultiValueMode multiValueMode;
     protected String[] names;
     protected VS  values1;
     protected VD  values2;
 
     public static class MultArrayValuesSource extends ArrayValuesSource<ValuesSource.Numeric,ValuesSource.GeoPoint> {
 
-        public MultArrayValuesSource(Map<String, ValuesSource> valuesSources, MultiValueMode multiValueMode) {
-            super(valuesSources, multiValueMode);
+        public MultArrayValuesSource(Map<String, ValuesSource> valuesSources) {
+            super(valuesSources);
             if (valuesSources != null) {
                 for (Map.Entry<String, ValuesSource> item:valuesSources.entrySet()
                      ) {
@@ -60,11 +58,10 @@ public class ArrayValuesSource<VS extends ValuesSource,VD extends ValuesSource> 
 //            return new Tuple<>(multiValueMode.select(values1[ordinal].doubleValues(ctx)),values2[ordinal].geoPointValues(ctx));
 //        }
     }
-    private ArrayValuesSource(Map<String, ?> valuesSources, MultiValueMode multiValueMode) {
+    private ArrayValuesSource(Map<String, ?> valuesSources) {
         if (valuesSources != null) {
             this.names = valuesSources.keySet().toArray(new String[0]);
         }
-        this.multiValueMode = multiValueMode;
     }
 
 

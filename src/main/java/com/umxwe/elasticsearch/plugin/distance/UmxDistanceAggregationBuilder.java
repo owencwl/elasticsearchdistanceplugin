@@ -27,7 +27,6 @@ public class UmxDistanceAggregationBuilder extends ArrayValuesSourceAggregationB
     private final static Logger logger = LoggerFactory.getLogger(UmxDistanceAggregationBuilder.class);
 
     public static final String NAME = "umxdistance";
-    private MultiValueMode multiValueMode = MultiValueMode.AVG;
 
     public UmxDistanceAggregationBuilder(String name) {
         super(name);
@@ -35,7 +34,6 @@ public class UmxDistanceAggregationBuilder extends ArrayValuesSourceAggregationB
 
     public UmxDistanceAggregationBuilder(UmxDistanceAggregationBuilder clone, AggregatorFactories.Builder factoriesBuilder, Map<String, Object> metadata) {
         super(clone, factoriesBuilder, metadata);
-        this.multiValueMode = clone.multiValueMode;
 
     }
 
@@ -47,17 +45,10 @@ public class UmxDistanceAggregationBuilder extends ArrayValuesSourceAggregationB
     protected void innerWriteTo(StreamOutput out) throws IOException {
         // Do nothing, no extra state to write to stream
     }
-    public UmxDistanceAggregationBuilder multiValueMode(MultiValueMode multiValueMode) {
-        this.multiValueMode = multiValueMode;
-        return this;
-    }
-    public MultiValueMode multiValueMode() {
-        return this.multiValueMode;
-    }
 
     @Override
     protected ArrayValuesSourceAggregatorFactory innerBuild(QueryShardContext queryShardContext, Map<String, ValuesSourceConfig> configs, AggregatorFactory parent, AggregatorFactories.Builder subFactoriesBuilder) throws IOException {
-        return new UmxDistanceAggregatorFactory(name, multiValueMode, configs, queryShardContext, parent, subFactoriesBuilder, metadata);
+        return new UmxDistanceAggregatorFactory(name,  configs, queryShardContext, parent, subFactoriesBuilder, metadata);
 
     }
 

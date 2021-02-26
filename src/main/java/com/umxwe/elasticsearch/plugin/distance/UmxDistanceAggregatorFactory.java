@@ -22,12 +22,8 @@ import java.util.Map;
 public class UmxDistanceAggregatorFactory extends ArrayValuesSourceAggregatorFactory {
     private final static Logger logger = LoggerFactory.getLogger(UmxDistanceAggregatorFactory.class);
 
-    private final MultiValueMode multiValueMode;
-
-    public UmxDistanceAggregatorFactory(String name,  MultiValueMode multiValueMode
-                                        ,Map<String, ValuesSourceConfig> configs, QueryShardContext queryShardContext, AggregatorFactory parent, AggregatorFactories.Builder subFactoriesBuilder, Map<String, Object> metadata) throws IOException {
+    public UmxDistanceAggregatorFactory(String name, Map<String, ValuesSourceConfig> configs, QueryShardContext queryShardContext, AggregatorFactory parent, AggregatorFactories.Builder subFactoriesBuilder, Map<String, Object> metadata) throws IOException {
         super(name, configs, queryShardContext, parent, subFactoriesBuilder, metadata);
-        this.multiValueMode = multiValueMode;
 
     }
 
@@ -44,12 +40,12 @@ public class UmxDistanceAggregatorFactory extends ArrayValuesSourceAggregatorFac
 //            typedValuesSources.put(entry.getKey(), (ValuesSource.Numeric) entry.getValue());
 //        }
         logger.info("doCreateInternal-valuesSources-size:{}", JSON.toJSONString(valuesSources.size()));
-        return new UmxDistanceAggregator(name, valuesSources, searchContext, parent, multiValueMode, metadata);
+        return new UmxDistanceAggregator(name, valuesSources, searchContext, parent,  metadata);
     }
 
     @Override
     protected Aggregator createUnmapped(SearchContext searchContext, Aggregator parent, Map<String, Object> metadata) throws IOException {
-        return new UmxDistanceAggregator(name, null, searchContext, parent,multiValueMode, metadata);
+        return new UmxDistanceAggregator(name, null, searchContext, parent, metadata);
     }
 
 }

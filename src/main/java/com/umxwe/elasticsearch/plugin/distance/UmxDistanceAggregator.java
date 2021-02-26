@@ -51,10 +51,10 @@ public class UmxDistanceAggregator extends MetricsAggregator {
     ObjectArray<UmxSpeedCompute> speeds;
 
 
-    public UmxDistanceAggregator(String name, Map<String, ValuesSource> valuesSources, SearchContext searchContext, Aggregator aggregator, MultiValueMode multiValueMode, Map<String, Object> stringObjectMap) throws IOException {
+    public UmxDistanceAggregator(String name, Map<String, ValuesSource> valuesSources, SearchContext searchContext, Aggregator aggregator, Map<String, Object> stringObjectMap) throws IOException {
         super(name, searchContext, aggregator, stringObjectMap);
         if (valuesSources != null && !valuesSources.isEmpty()) {
-            this.valuesSources = new ArrayValuesSource.MultArrayValuesSource(valuesSources, multiValueMode);
+            this.valuesSources = new ArrayValuesSource.MultArrayValuesSource(valuesSources);
             logger.info("UmxDistanceAggregator_values1_size:{},values2_size:{}"
                     , this.valuesSources.values1 != null ? this.valuesSources.values1 : 0
                     , this.valuesSources.values2 != null ? this.valuesSources.values2 : 0);
@@ -115,8 +115,6 @@ public class UmxDistanceAggregator extends MetricsAggregator {
 
         logger.info("fieldNames:{},number_docValueCount:{},geo_docValueCount:{}", valuesSources.fieldNames(), values1.docValueCount(), values2.docValueCount());
 
-//        Tuple values= new Tuple<>(values1,values2);
-//        GeoDistance.ARC.calculate();
         //valuesSources 转为 number and  geopoint类型
         return new LeafBucketCollectorBase(sub, null) {
             @Override

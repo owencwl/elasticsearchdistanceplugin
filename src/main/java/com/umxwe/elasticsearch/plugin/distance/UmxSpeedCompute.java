@@ -44,7 +44,8 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
 
     public UmxSpeedCompute(StreamInput in) throws IOException {
         docCount = (Long) in.readGenericValue();
-
+        maxSpeed= (double) in.readGenericValue();
+        timeStampAndLocation= convertIfNeeded((HashMap<Double, GeoPoint>) in.readGenericValue());
     }
 
     // Convert Map to HashMap if it isn't
