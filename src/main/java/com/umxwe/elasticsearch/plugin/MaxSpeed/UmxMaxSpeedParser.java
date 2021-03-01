@@ -1,17 +1,16 @@
-package com.umxwe.elasticsearch.plugin.distance;
+package com.umxwe.elasticsearch.plugin.MaxSpeed;
 
-import com.umxwe.elasticsearch.plugin.distance.support.ArrayValuesSourceAggregationBuilder;
-import com.umxwe.elasticsearch.plugin.distance.support.ArrayValuesSourceParser;
+import com.umxwe.elasticsearch.plugin.MaxSpeed.support.ArrayValuesSourceAggregationBuilder;
+import com.umxwe.elasticsearch.plugin.MaxSpeed.support.ArrayValuesSourceParser;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.search.MultiValueMode;
 import org.elasticsearch.search.aggregations.support.ValueType;
 import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 
 import java.io.IOException;
 import java.util.Map;
 
-import static com.umxwe.elasticsearch.plugin.distance.support.ArrayValuesSourceAggregationBuilder.MULTIVALUE_MODE_FIELD;
+import static com.umxwe.elasticsearch.plugin.MaxSpeed.support.ArrayValuesSourceAggregationBuilder.MULTIVALUE_MODE_FIELD;
 
 /**
  * @ClassName UmxDistanceParser
@@ -19,19 +18,15 @@ import static com.umxwe.elasticsearch.plugin.distance.support.ArrayValuesSourceA
  * @Author owen(umxwe)
  * @Date 2021/2/24
  */
-public class UmxDistanceParser extends ArrayValuesSourceParser.NumericValuesSourceParser {
+public class UmxMaxSpeedParser extends ArrayValuesSourceParser.NumericValuesSourceParser {
 
-    public UmxDistanceParser() {
+    public UmxMaxSpeedParser() {
         super(true);
     }
 
     @Override
     protected ArrayValuesSourceAggregationBuilder<?> createFactory(String aggregationName, ValuesSourceType valuesSourceType, ValueType targetValueType, Map<ParseField, Object> otherOptions) {
-        UmxDistanceAggregationBuilder builder = new UmxDistanceAggregationBuilder(aggregationName);
-//        String mode = (String)otherOptions.get(MULTIVALUE_MODE_FIELD);
-//        if (mode != null) {
-//            builder.multiValueMode(MultiValueMode.fromString(mode));
-//        }
+        UmxMaxSpeedAggregationBuilder builder = new UmxMaxSpeedAggregationBuilder(aggregationName);
         return builder;
     }
 

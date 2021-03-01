@@ -1,4 +1,4 @@
-package com.umxwe.elasticsearch.plugin.distance.support;
+package com.umxwe.elasticsearch.plugin.MaxSpeed.support;
 
 /**
  * @ClassName ArrayValuesSource

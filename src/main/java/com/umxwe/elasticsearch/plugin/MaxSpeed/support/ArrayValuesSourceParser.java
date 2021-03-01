@@ -1,4 +1,4 @@
-package com.umxwe.elasticsearch.plugin.distance.support;
+package com.umxwe.elasticsearch.plugin.MaxSpeed.support;
 
 /**
  * @ClassName ArrayValuesSourceParser
@@ -16,11 +16,7 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.support.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public abstract class ArrayValuesSourceParser<VS extends ValuesSource> implements Aggregator.Parser {
 
@@ -163,16 +159,12 @@ public abstract class ArrayValuesSourceParser<VS extends ValuesSource> implement
      * {@link ArrayValuesSourceParser} itself will be added to the factory
      * after it has been returned by this method.
      *
-     * @param aggregationName
-     *            the name of the aggregation
-     * @param valuesSourceType
-     *            the type of the {@link ValuesSource}
-     * @param targetValueType
-     *            the target type of the final value output by the aggregation
-     * @param otherOptions
-     *            a {@link Map} containing the extra options parsed by the
-     *            {@link #token(String, String, XContentParser.Token, XContentParser, Map)}
-     *            method
+     * @param aggregationName  the name of the aggregation
+     * @param valuesSourceType the type of the {@link ValuesSource}
+     * @param targetValueType  the target type of the final value output by the aggregation
+     * @param otherOptions     a {@link Map} containing the extra options parsed by the
+     *                         {@link #token(String, String, XContentParser.Token, XContentParser, Map)}
+     *                         method
      * @return the created factory
      */
     protected abstract ArrayValuesSourceAggregationBuilder<?> createFactory(String aggregationName,
@@ -185,23 +177,17 @@ public abstract class ArrayValuesSourceParser<VS extends ValuesSource> implement
      * parameters and store them in a {@link Map} which will later be passed to
      * {@link #createFactory(String, ValuesSourceType, ValueType, Map)}.
      *
-     * @param aggregationName
-     *            the name of the aggregation
-     * @param currentFieldName
-     *            the name of the current field being parsed
-     * @param token
-     *            the current token for the parser
-     * @param parser
-     *            the parser
-     * @param otherOptions
-     *            a {@link Map} of options to be populated by successive calls
-     *            to this method which will then be passed to the
-     *            {@link #createFactory(String, ValuesSourceType, ValueType, Map)}
-     *            method
+     * @param aggregationName  the name of the aggregation
+     * @param currentFieldName the name of the current field being parsed
+     * @param token            the current token for the parser
+     * @param parser           the parser
+     * @param otherOptions     a {@link Map} of options to be populated by successive calls
+     *                         to this method which will then be passed to the
+     *                         {@link #createFactory(String, ValuesSourceType, ValueType, Map)}
+     *                         method
      * @return <code>true</code> if the current token was correctly parsed,
-     *         <code>false</code> otherwise
-     * @throws IOException
-     *             if an error occurs whilst parsing
+     * <code>false</code> otherwise
+     * @throws IOException if an error occurs whilst parsing
      */
     protected abstract boolean token(String aggregationName, String currentFieldName, XContentParser.Token token, XContentParser parser,
                                      Map<ParseField, Object> otherOptions) throws IOException;

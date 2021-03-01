@@ -1,12 +1,9 @@
-package com.umxwe.elasticsearch.plugin.distance;
+package com.umxwe.elasticsearch.plugin.MaxSpeed;
 
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
-import org.elasticsearch.search.aggregations.metrics.InternalSum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,20 +12,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static java.util.Collections.emptyMap;
-
 /**
  * @ClassName InternalUmxDistance
  * @Description Todo
  * @Author owen(umxwe)
  * @Date 2021/2/23
  */
-public class InternalUmxDistance extends InternalAggregation implements UmxDistance {
-    private final static Logger logger = LoggerFactory.getLogger(InternalUmxDistance.class);
+public class InternalUmxMaxSpeed extends InternalAggregation implements UmxMaxSpeed {
+    private final static Logger logger = LoggerFactory.getLogger(InternalUmxMaxSpeed.class);
 
     private final UmxSpeedCompute speedCompute;
-    private final double result;
-    private final long count;
+    private final double result;//最后的最大速度
+    private final long count;//次数
 
     public UmxSpeedCompute getSpeedCompute() {
         return speedCompute;
@@ -42,21 +37,19 @@ public class InternalUmxDistance extends InternalAggregation implements UmxDista
         return count;
     }
 
-    public InternalUmxDistance(StreamInput in) throws IOException {
+    public InternalUmxMaxSpeed(StreamInput in) throws IOException {
         super(in);
         speedCompute = in.readOptionalWriteable(UmxSpeedCompute::new);
         result = in.readDouble();
         count = in.readVLong();
-
     }
 
-    public InternalUmxDistance(String name, long count, double result, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
+    public InternalUmxMaxSpeed(String name, long count, double result, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
         super(name, metadata);
         this.speedCompute = umxSpeedComputeResults;
         this.result = result;
         this.count = count;
     }
-
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
@@ -74,21 +67,42 @@ public class InternalUmxDistance extends InternalAggregation implements UmxDista
      */
     @Override
     public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+
+        // merge stats across all shards
+        List<InternalAggregation> aggs = new ArrayList<>(aggregations);
+        aggs.removeIf(p -> ((InternalUmxMaxSpeed) p).speedCompute == null);
+
+
+        // return empty result iff all stats are null
+        if (aggregations.isEmpty()) {
+            return new InternalUmxMaxSpeed(name, 0, 0.0, new UmxSpeedCompute(), getMetadata());
+        }
+
         UmxSpeedCompute umxSpeedCompute = new UmxSpeedCompute();
 
+        /**
+         * 迭代合并计算结果
+         */
         for (InternalAggregation aggregation : aggregations) {
-            UmxSpeedCompute value = ((InternalUmxDistance) aggregation).speedCompute;
+            UmxSpeedCompute value = ((InternalUmxMaxSpeed) aggregation).speedCompute;
             umxSpeedCompute.merge(value);
         }
         if (reduceContext.isFinalReduce()) {
             logger.info("InternalUmxDistance_isFinalReduce:{}", reduceContext.isFinalReduce());
-            return new InternalUmxDistance(name, umxSpeedCompute.docCount, umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
+            return new InternalUmxMaxSpeed(name, umxSpeedCompute.docCount, umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
         }
-        return new InternalUmxDistance(name, 0, 0.0, umxSpeedCompute, getMetadata());
+        return new InternalUmxMaxSpeed(name, 0, 0.0, umxSpeedCompute, getMetadata());
     }
 
     /**
-     * 计算结果进行返回
+     * 返回字段
+     */
+    static class Fields {
+        public static final String MAXSPEED = "MaxSpeed";
+    }
+
+    /**
+     * 组装结果，将计算结果进行返回
      *
      * @param builder
      * @param params
@@ -97,7 +111,6 @@ public class InternalUmxDistance extends InternalAggregation implements UmxDista
      */
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-
 
         /**
          * eg:
@@ -108,17 +121,15 @@ public class InternalUmxDistance extends InternalAggregation implements UmxDista
          *    }
          */
         builder.field(CommonFields.DOC_COUNT.getPreferredName(), count);
-        builder.field("maxspeed", result);
-
+        builder.field(Fields.MAXSPEED, result);
 
         return builder;
     }
 
     @Override
     public String getWriteableName() {
-        return UmxDistanceAggregationBuilder.NAME;
+        return UmxMaxSpeedAggregationBuilder.NAME;
     }
-
 
     @Override
     public long getDocCount() {

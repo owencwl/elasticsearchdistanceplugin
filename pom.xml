@@ -12,9 +12,11 @@
     <properties>
         <fastjson>1.2.73</fastjson>
         <elasticsearch.version>7.9.1</elasticsearch.version>
-        <elasticsearch.assembly.descriptor>${project.basedir}/src/main/assemblies/plugin.xml</elasticsearch.assembly.descriptor>
+        <elasticsearch.assembly.descriptor>${project.basedir}/src/main/assemblies/plugin.xml
+        </elasticsearch.assembly.descriptor>
         <elasticsearch.plugin.name>elasticsearch-distance-plugin</elasticsearch.plugin.name>
-        <elasticsearch.plugin.classname>com.umxwe.elasticsearch.plugin.distance.UmxDistanceAggregationPlugin</elasticsearch.plugin.classname>
+        <elasticsearch.plugin.classname>com.umxwe.elasticsearch.plugin.MaxSpeed.UmxMaxSpeedAggregationPlugin
+        </elasticsearch.plugin.classname>
         <elasticsearch.plugin.jvm>true</elasticsearch.plugin.jvm>
         <tests.rest.load_packaged>false</tests.rest.load_packaged>
         <skip.unit.tests>true</skip.unit.tests>

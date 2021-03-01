@@ -1,6 +1,5 @@
-package com.umxwe.elasticsearch.plugin.distance;
+package com.umxwe.elasticsearch.plugin.MaxSpeed;
 
-import com.alibaba.fastjson.JSON;
 import org.elasticsearch.common.geo.GeoDistance;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -11,9 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
+import java.util.TreeMap;
 
 /**
  * @ClassName UmxDistanceCompute
@@ -22,13 +20,20 @@ import java.util.Random;
  * @Date 2021/2/24
  */
 public class UmxSpeedCompute implements Writeable, Cloneable {
-
     private final static Logger logger = LoggerFactory.getLogger(UmxSpeedCompute.class);
 
     private double maxSpeed = Double.NEGATIVE_INFINITY;
 
-    private  HashMap<Double, GeoPoint> timeStampAndLocation;
+    /**
+     * treemap 保持key（时间）有序，即按照时间排序
+     */
+    private TreeMap<Double, GeoPoint> timeStampAndLocation;
+
+    /**
+     * 文档数量，只做统计计算，会作为返回结果
+     */
     protected long docCount = 0;
+
 
     public UmxSpeedCompute() {
         init();
@@ -40,25 +45,21 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
         this.add(timestamp, location);
     }
 
+    /**
+     * 初始化
+     */
     private void init() {
-        timeStampAndLocation = new HashMap<>();
+        timeStampAndLocation = new TreeMap<>();
     }
 
+    /**
+     * @param in
+     * @throws IOException
+     */
     public UmxSpeedCompute(StreamInput in) throws IOException {
         this();
         docCount = (Long) in.readGenericValue();
-        maxSpeed= (double) in.readGenericValue();
-        logger.info("UmxSpeedCompute:{},docCount:{},maxSpeed:{}", "",docCount,maxSpeed);
-//        timeStampAndLocation= convertIfNeeded((HashMap<Double, GeoPoint>) in.readGenericValue());
-    }
-
-    // Convert Map to HashMap if it isn't
-    private static <K, V> HashMap<K, V> convertIfNeeded(Map<K, V> map) {
-        if (map instanceof HashMap) {
-            return (HashMap<K, V>) map;
-        } else {
-            return new HashMap<>(map);
-        }
+        maxSpeed = (double) in.readGenericValue();
     }
 
     @Override
@@ -89,41 +90,58 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
             return;
         }
         /**
-         * 仅供测试使用
+         * 仅供测试使用，速度取随机值
          */
 //        double speed= new Random().nextDouble();
 //        maxSpeed = Math.max(maxSpeed, speed);
 //        logger.info("maxSpeed:{}",maxSpeed);
 
-
         for (Map.Entry<Double, GeoPoint> item : timeStampAndLocation.entrySet()
         ) {
+            /**
+             * 使用ARC计算距离，转换为km为单位
+             */
             double distance = GeoDistance.ARC.calculate(
                     location.lat(), location.lon()
                     , item.getValue().lat(), item.getValue().lon()
                     , DistanceUnit.KILOMETERS);
 
-            double time = Math.abs(item.getKey() - timestamp) / 1000 * 60 * 60;
+            /**
+             * 计算时间差，将时间转换为小时为单位
+             */
+            double timeInterval = Math.abs(item.getKey() - timestamp) / 1000 * 60 * 60;
 
-            if(time==0.0){
+
+            if (timeInterval == 0.0) {
                 //时间差为0，直接返回负无穷大
                 maxSpeed = Math.max(maxSpeed, Double.NEGATIVE_INFINITY);
                 return;
-            }else if(time==0.0 && distance > 80){
+            } else if (timeInterval == 0.0 && distance > 80) {
                 //时间差为0，并且距离大于80km以上，直接返回正无穷大，说明存在套牌车
                 maxSpeed = Math.max(maxSpeed, Double.POSITIVE_INFINITY);
                 return;
             }
 
-            double speed = distance / time;
-            logger.info("distance:{},timestamp:{},speed:{}", distance, time, speed);
-            maxSpeed = Math.max(maxSpeed, speed);
+            /**
+             * 计算当前速度
+             */
+            double currentSpeed = distance / timeInterval;
+            logger.info("distance:{},timeInterval:{},currentSpeed:{}", distance, timeInterval, currentSpeed);
+
+            /**
+             * 计算速度最大值
+             */
+            maxSpeed = Math.max(maxSpeed, currentSpeed);
         }
         logger.info("speed_time:{} ms", System.currentTimeMillis() - current);
         timeStampAndLocation.put(timestamp, location);
-
     }
 
+    /**
+     * 多个计算单元进行合并，主要将最大速度和次数进行合并
+     *
+     * @param other
+     */
     public void merge(final UmxSpeedCompute other) {
         if (other == null) {
             return;
@@ -136,6 +154,11 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
         this.maxSpeed = Math.max(this.maxSpeed, other.maxSpeed);
     }
 
+    /**
+     * 获取最大速度
+     *
+     * @return
+     */
     public double getMaxSpeed() {
         return maxSpeed;
     }
