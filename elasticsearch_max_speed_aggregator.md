@@ -8,7 +8,7 @@
 
 短时异地出没：对每个车牌分组分析，在所有记录中根据记录中的经纬度和抓拍时间计算速度，超过120km/h则是短时异地出没
 
-![image-20210218092733914](file://G:\优美文档\um_work_log\2021.1.4worklog.assets\image-20210218092733914.png?lastModify=1614593633)
+![image-20210218092733914](assets\image-20210218092733914.png?lastModify=1614593633)
 
 #### es自定义aggregator的步骤
 
