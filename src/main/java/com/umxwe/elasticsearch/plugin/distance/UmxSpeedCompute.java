@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * @ClassName UmxDistanceCompute
@@ -84,7 +85,14 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
             maxSpeed = 0.0;
             return;
         }
+        /**
+         * 仅供测试使用
+         */
+        double speed= new Random().nextDouble();
+        maxSpeed = Math.max(maxSpeed, speed);
+        logger.info("maxSpeed:{}",maxSpeed);
 
+        /*
         for (Map.Entry<Double, GeoPoint> item : timeStampAndLocation.entrySet()
         ) {
             double distance = GeoDistance.ARC.calculate(
@@ -105,11 +113,13 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
             }
 
             double speed = distance / time;
-            logger.info("distance:{},time:{},speed:{}", distance, time, speed);
+            logger.info("distance:{},timestamp:{},speed:{}", distance, time, speed);
             maxSpeed = Math.max(maxSpeed, speed);
         }
-        logger.info("distance_time:{} ms", System.currentTimeMillis() - current);
+        logger.info("speed_time:{} ms", System.currentTimeMillis() - current);
         timeStampAndLocation.put(timestamp, location);
+
+         */
     }
 
     public void merge(final UmxSpeedCompute other) {
