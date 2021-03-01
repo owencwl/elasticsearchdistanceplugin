@@ -83,6 +83,8 @@ public class UmxDistanceAggregator extends MetricsAggregator {
         //每个bucket的计算结果对象
         final UmxSpeedCompute speed = speeds.get(bucket);
         return new InternalUmxDistance(name, 0,0, speed, metadata());
+//        return new InternalMax(name, maxes.get(bucket), formatter, metadata());
+
     }
 
     @Override

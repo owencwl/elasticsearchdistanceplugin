@@ -1,5 +1,6 @@
 package com.umxwe.elasticsearch.plugin.distance;
 
+import com.alibaba.fastjson.JSON;
 import org.elasticsearch.common.geo.GeoDistance;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -26,7 +27,7 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
 
     private double maxSpeed = Double.NEGATIVE_INFINITY;
 
-    private HashMap<Double, GeoPoint> timeStampAndLocation;
+    private  HashMap<Double, GeoPoint> timeStampAndLocation;
     protected long docCount = 0;
 
     public UmxSpeedCompute() {
@@ -44,9 +45,11 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
     }
 
     public UmxSpeedCompute(StreamInput in) throws IOException {
+        this();
         docCount = (Long) in.readGenericValue();
         maxSpeed= (double) in.readGenericValue();
-        timeStampAndLocation= convertIfNeeded((HashMap<Double, GeoPoint>) in.readGenericValue());
+        logger.info("UmxSpeedCompute:{},docCount:{},maxSpeed:{}", "",docCount,maxSpeed);
+//        timeStampAndLocation= convertIfNeeded((HashMap<Double, GeoPoint>) in.readGenericValue());
     }
 
     // Convert Map to HashMap if it isn't
@@ -88,11 +91,11 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
         /**
          * 仅供测试使用
          */
-        double speed= new Random().nextDouble();
-        maxSpeed = Math.max(maxSpeed, speed);
-        logger.info("maxSpeed:{}",maxSpeed);
+//        double speed= new Random().nextDouble();
+//        maxSpeed = Math.max(maxSpeed, speed);
+//        logger.info("maxSpeed:{}",maxSpeed);
 
-        /*
+
         for (Map.Entry<Double, GeoPoint> item : timeStampAndLocation.entrySet()
         ) {
             double distance = GeoDistance.ARC.calculate(
@@ -119,7 +122,6 @@ public class UmxSpeedCompute implements Writeable, Cloneable {
         logger.info("speed_time:{} ms", System.currentTimeMillis() - current);
         timeStampAndLocation.put(timestamp, location);
 
-         */
     }
 
     public void merge(final UmxSpeedCompute other) {

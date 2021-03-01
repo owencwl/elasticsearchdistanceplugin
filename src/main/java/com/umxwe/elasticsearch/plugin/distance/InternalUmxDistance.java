@@ -15,20 +15,32 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * @ClassName InternalUmxDistance
  * @Description Todo
  * @Author owen(umxwe)
  * @Date 2021/2/23
  */
-public class InternalUmxDistance extends InternalNumericMetricsAggregation.SingleValue implements UmxDistance {
+public class InternalUmxDistance extends InternalAggregation implements UmxDistance {
     private final static Logger logger = LoggerFactory.getLogger(InternalUmxDistance.class);
 
     private final UmxSpeedCompute speedCompute;
+    private final double result;
+    private final long count;
 
-    private  final double result;
-    private  final long count;
+    public UmxSpeedCompute getSpeedCompute() {
+        return speedCompute;
+    }
 
+    public double getResult() {
+        return result;
+    }
+
+    public long getCount() {
+        return count;
+    }
 
     public InternalUmxDistance(StreamInput in) throws IOException {
         super(in);
@@ -36,10 +48,9 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
         result = in.readDouble();
         count = in.readVLong();
 
-
     }
 
-    public InternalUmxDistance(String name,long count, double result, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
+    public InternalUmxDistance(String name, long count, double result, UmxSpeedCompute umxSpeedComputeResults, Map<String, Object> metadata) {
         super(name, metadata);
         this.speedCompute = umxSpeedComputeResults;
         this.result = result;
@@ -49,6 +60,7 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
+        out.writeOptionalWriteable(speedCompute);
         out.writeDouble(result);
         out.writeVLong(count);
     }
@@ -69,10 +81,10 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
             umxSpeedCompute.merge(value);
         }
         if (reduceContext.isFinalReduce()) {
-            logger.info("InternalUmxDistance_isFinalReduce:{}",reduceContext.isFinalReduce());
-            return new InternalUmxDistance(name, umxSpeedCompute.docCount,umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
+            logger.info("InternalUmxDistance_isFinalReduce:{}", reduceContext.isFinalReduce());
+            return new InternalUmxDistance(name, umxSpeedCompute.docCount, umxSpeedCompute.getMaxSpeed(), umxSpeedCompute, getMetadata());
         }
-        return new InternalUmxDistance(name,0, 0.0, umxSpeedCompute, getMetadata());
+        return new InternalUmxDistance(name, 0, 0.0, umxSpeedCompute, getMetadata());
     }
 
     /**
@@ -95,7 +107,7 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
          *        "maxspeed" : 3.0887521601880075E-7
          *    }
          */
-        builder.field(CommonFields.DOC_COUNT.getPreferredName(),count);
+        builder.field(CommonFields.DOC_COUNT.getPreferredName(), count);
         builder.field("maxspeed", result);
 
 
@@ -107,13 +119,34 @@ public class InternalUmxDistance extends InternalNumericMetricsAggregation.Singl
         return UmxDistanceAggregationBuilder.NAME;
     }
 
+
     @Override
-    public double value() {
+    public long getDocCount() {
+        return count;
+    }
+
+    @Override
+    public double getMaxSpeed() {
         return result;
     }
 
     @Override
-    public double getValue() {
-        return result;
+    public Object getProperty(List<String> path) {
+        if (path.isEmpty()) {
+            return this;
+        } else if (path.size() == 1) {
+            String element = path.get(0);
+            switch (element) {
+                case "count":
+                    return count;
+                case "result":
+                    return result;
+                default:
+                    throw new IllegalArgumentException("Found unknown path element [" + element + "] in [" + getName() + "]");
+            }
+        } else {
+            throw new IllegalArgumentException("path not supported for [" + getName() + "]: " + path);
+        }
     }
+
 }
